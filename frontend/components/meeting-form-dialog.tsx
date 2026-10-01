@@ -1,15 +1,15 @@
-"use client"
+"use client";
 
-import { zodResolver } from "@hookform/resolvers/zod"
-import { CalendarIcon } from "lucide-react"
-import { useEffect, useState } from "react"
-import { Controller, useForm } from "react-hook-form"
-import { toast } from "sonner"
-import { z } from "zod"
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CalendarIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 
-import { ParticipantsInput } from "@/components/participants-input"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
+import { ParticipantsInput } from "@/components/participants-input";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
@@ -17,20 +17,33 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Textarea } from "@/components/ui/textarea"
-import { useCreateMeeting, useUpdateMeeting } from "@/hooks/use-meetings"
-import { ApiError } from "@/lib/api"
-import { formatTime, parseIsoDay, toIsoDate, toIsoWithOffset } from "@/lib/datetime"
-import type { Meeting } from "@/lib/types"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
+import { useCreateMeeting, useUpdateMeeting } from "@/hooks/use-meetings";
+import { ApiError } from "@/lib/api";
+import {
+  formatTime,
+  parseIsoDay,
+  toIsoDate,
+  toIsoWithOffset,
+} from "@/lib/datetime";
+import type { Meeting } from "@/lib/types";
 
-const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/
+const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const participantSchema = z.object({
-  name: z.string().trim().min(1, "Name is required").max(120, "Name is too long"),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .max(120, "Name is too long"),
   email: z
     .string()
     .trim()
@@ -39,12 +52,20 @@ const participantSchema = z.object({
       message: "Enter a valid email address",
     })
     .optional(),
-})
+});
 
 const formSchema = z
   .object({
-    name: z.string().trim().min(1, "Name is required").max(200, "Name is too long"),
-    description: z.string().trim().max(2000, "Description is too long").optional(),
+    name: z
+      .string()
+      .trim()
+      .min(1, "Name is required")
+      .max(200, "Name is too long"),
+    description: z
+      .string()
+      .trim()
+      .max(2000, "Description is too long")
+      .optional(),
     location: z.string().trim().max(200, "Location is too long").optional(),
     date: z.date(),
     startTime: z.string().regex(timePattern, "Use HH:mm"),
@@ -58,28 +79,30 @@ const formSchema = z
   .refine(
     (data) => {
       const keys = data.participants.map(
-        (p) => `${p.name.trim().toLowerCase()}|${(p.email ?? "").trim().toLowerCase()}`,
-      )
-      return new Set(keys).size === keys.length
+        (p) =>
+          `${p.name.trim().toLowerCase()}|${(p.email ?? "").trim().toLowerCase()}`,
+      );
+      return new Set(keys).size === keys.length;
     },
     { message: "Participants must be unique", path: ["participants"] },
-  )
+  );
 
-type FormValues = z.infer<typeof formSchema>
+type FormValues = z.infer<typeof formSchema>;
 
-type ParticipantErrors = { name?: { message?: string }; email?: { message?: string } }
+type ParticipantErrors = {
+  name?: { message?: string };
+  email?: { message?: string };
+};
 
 /** Flattens react-hook-form's per-row participant errors into { rowIndex: message }. */
-function participantErrors(
-  rows: unknown,
-): Record<number, string | undefined> {
-  if (!Array.isArray(rows)) return {}
+function participantErrors(rows: unknown): Record<number, string | undefined> {
+  if (!Array.isArray(rows)) return {};
   return Object.fromEntries(
     rows.map((row: ParticipantErrors | undefined, index: number) => [
       index,
       row?.name?.message ?? row?.email?.message,
     ]),
-  )
+  );
 }
 
 /** Blank form for a new meeting, or the meeting's current values when editing. */
@@ -93,7 +116,7 @@ function defaultValues(meeting?: Meeting): FormValues {
       startTime: "10:00",
       endTime: "11:00",
       participants: [{ name: "", email: "" }],
-    }
+    };
   }
   return {
     name: meeting.name,
@@ -104,9 +127,12 @@ function defaultValues(meeting?: Meeting): FormValues {
     endTime: formatTime(meeting.ends_at),
     participants:
       meeting.participants.length > 0
-        ? meeting.participants.map((p) => ({ name: p.name, email: p.email ?? "" }))
+        ? meeting.participants.map((p) => ({
+            name: p.name,
+            email: p.email ?? "",
+          }))
         : [{ name: "", email: "" }],
-  }
+  };
 }
 
 /** Creates a meeting, or edits `meeting` when one is passed. */
@@ -115,19 +141,19 @@ export function MeetingFormDialog({
   onOpenChange,
   meeting,
 }: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  meeting?: Meeting
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  meeting?: Meeting;
 }) {
-  const createMeeting = useCreateMeeting()
-  const updateMeeting = useUpdateMeeting()
-  const [datePickerOpen, setDatePickerOpen] = useState(false)
-  const isEdit = !!meeting
+  const createMeeting = useCreateMeeting();
+  const updateMeeting = useUpdateMeeting();
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const isEdit = !!meeting;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: defaultValues(meeting),
-  })
+  });
 
   const {
     register,
@@ -136,12 +162,12 @@ export function MeetingFormDialog({
     reset,
     setError,
     formState: { errors, isSubmitting },
-  } = form
+  } = form;
 
   // Refill the form each time it opens, so edits start from the meeting's current values.
   useEffect(() => {
-    if (open) reset(defaultValues(meeting))
-  }, [open, meeting, reset])
+    if (open) reset(defaultValues(meeting));
+  }, [open, meeting, reset]);
 
   const onSubmit = handleSubmit(async (values) => {
     const participants = values.participants
@@ -149,7 +175,7 @@ export function MeetingFormDialog({
       .map((participant) => ({
         name: participant.name.trim(),
         email: participant.email?.trim() ? participant.email.trim() : null,
-      }))
+      }));
 
     const payload = {
       name: values.name.trim(),
@@ -158,17 +184,17 @@ export function MeetingFormDialog({
       starts_at: toIsoWithOffset(values.date, values.startTime),
       ends_at: toIsoWithOffset(values.date, values.endTime),
       participants,
-    }
+    };
 
     try {
       if (meeting) {
-        await updateMeeting.mutateAsync({ id: meeting.id, payload })
-        toast.success("Meeting updated")
+        await updateMeeting.mutateAsync({ id: meeting.id, payload });
+        toast.success("Meeting updated");
       } else {
-        await createMeeting.mutateAsync(payload)
-        toast.success("Meeting created")
+        await createMeeting.mutateAsync(payload);
+        toast.success("Meeting created");
       }
-      onOpenChange(false)
+      onOpenChange(false);
     } catch (error) {
       if (error instanceof ApiError) {
         // Map server-side field errors back onto the matching inputs.
@@ -179,17 +205,21 @@ export function MeetingFormDialog({
           starts_at: "startTime",
           ends_at: "endTime",
           participants: "participants",
-        }
+        };
         for (const detail of error.details) {
-          const target = fieldMap[detail.field.split(".")[0] ?? ""]
-          if (target) setError(target, { message: detail.message })
+          const target = fieldMap[detail.field.split(".")[0] ?? ""];
+          if (target) setError(target, { message: detail.message });
         }
-        toast.error(error.message)
+        toast.error(error.message);
       } else {
-        toast.error(isEdit ? "Could not update the meeting." : "Could not create the meeting.")
+        toast.error(
+          isEdit
+            ? "Could not update the meeting."
+            : "Could not create the meeting.",
+        );
       }
     }
-  })
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -229,13 +259,19 @@ export function MeetingFormDialog({
               {...register("description")}
             />
             {errors.description ? (
-              <p className="text-destructive text-sm">{errors.description.message}</p>
+              <p className="text-destructive text-sm">
+                {errors.description.message}
+              </p>
             ) : null}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="location">Location</Label>
-            <Input id="location" placeholder="Room 3 or a meeting link" {...register("location")} />
+            <Input
+              id="location"
+              placeholder="Room 3 or a meeting link"
+              {...register("location")}
+            />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
@@ -245,7 +281,10 @@ export function MeetingFormDialog({
                 control={control}
                 name="date"
                 render={({ field }) => (
-                  <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                  <Popover
+                    open={datePickerOpen}
+                    onOpenChange={setDatePickerOpen}
+                  >
                     <PopoverTrigger asChild>
                       <Button
                         type="button"
@@ -261,8 +300,8 @@ export function MeetingFormDialog({
                         mode="single"
                         selected={field.value}
                         onSelect={(date) => {
-                          if (date) field.onChange(date)
-                          setDatePickerOpen(false)
+                          if (date) field.onChange(date);
+                          setDatePickerOpen(false);
                         }}
                         autoFocus
                       />
@@ -274,17 +313,31 @@ export function MeetingFormDialog({
 
             <div className="space-y-2">
               <Label htmlFor="startTime">Start</Label>
-              <Input id="startTime" type="time" step={900} {...register("startTime")} />
+              <Input
+                id="startTime"
+                type="time"
+                step={900}
+                {...register("startTime")}
+              />
               {errors.startTime ? (
-                <p className="text-destructive text-sm">{errors.startTime.message}</p>
+                <p className="text-destructive text-sm">
+                  {errors.startTime.message}
+                </p>
               ) : null}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="endTime">End</Label>
-              <Input id="endTime" type="time" step={900} {...register("endTime")} />
+              <Input
+                id="endTime"
+                type="time"
+                step={900}
+                {...register("endTime")}
+              />
               {errors.endTime ? (
-                <p className="text-destructive text-sm">{errors.endTime.message}</p>
+                <p className="text-destructive text-sm">
+                  {errors.endTime.message}
+                </p>
               ) : null}
             </div>
           </div>
@@ -301,11 +354,17 @@ export function MeetingFormDialog({
             )}
           />
           {errors.participants?.message ? (
-            <p className="text-destructive text-sm">{errors.participants.message}</p>
+            <p className="text-destructive text-sm">
+              {errors.participants.message}
+            </p>
           ) : null}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
@@ -321,5 +380,5 @@ export function MeetingFormDialog({
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

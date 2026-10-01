@@ -1,16 +1,16 @@
-"use client"
+"use client";
 
-import { AlertCircle, CalendarDays, CalendarPlus } from "lucide-react"
+import { AlertCircle, CalendarDays, CalendarPlus } from "lucide-react";
 
-import { MeetingCard } from "@/components/meeting-card"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { useMeetings } from "@/hooks/use-meetings"
-import type { Meeting } from "@/lib/types"
+import { MeetingCard } from "@/components/meeting-card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useMeetings } from "@/hooks/use-meetings";
+import type { Meeting } from "@/lib/types";
 
-const GRID = "grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+const GRID = "grid gap-4 sm:grid-cols-2 lg:grid-cols-3";
 
 /** Shown while the first request for the day's meetings is in flight. */
 function LoadingScreen() {
@@ -40,7 +40,9 @@ function LoadingScreen() {
         </span>
         <div>
           <p className="text-lg font-bold">Loading your meetings…</p>
-          <p className="text-muted-foreground text-sm">Fetching today&apos;s schedule.</p>
+          <p className="text-muted-foreground text-sm">
+            Fetching today&apos;s schedule.
+          </p>
         </div>
       </div>
 
@@ -53,7 +55,10 @@ function LoadingScreen() {
               <Skeleton className="h-4 w-full" />
               <div className="flex -space-x-2 pt-1">
                 {[0, 1, 2].map((avatar) => (
-                  <Skeleton key={avatar} className="ring-card size-8 rounded-full ring-2" />
+                  <Skeleton
+                    key={avatar}
+                    className="ring-card size-8 rounded-full ring-2"
+                  />
                 ))}
               </div>
             </CardContent>
@@ -61,7 +66,7 @@ function LoadingScreen() {
         ))}
       </div>
     </div>
-  )
+  );
 }
 
 export function MeetingList({
@@ -70,15 +75,15 @@ export function MeetingList({
   onEdit,
   onDelete,
 }: {
-  onCreate: () => void
-  onView: (meeting: Meeting) => void
-  onEdit: (meeting: Meeting) => void
-  onDelete: (meeting: Meeting) => void
+  onCreate: () => void;
+  onView: (meeting: Meeting) => void;
+  onEdit: (meeting: Meeting) => void;
+  onDelete: (meeting: Meeting) => void;
 }) {
-  const { data, isPending, isError, error, refetch } = useMeetings()
+  const { data, isPending, isError, error, refetch } = useMeetings();
 
   if (isPending) {
-    return <LoadingScreen />
+    return <LoadingScreen />;
   }
 
   if (isError) {
@@ -87,13 +92,15 @@ export function MeetingList({
         <AlertCircle className="size-4" aria-hidden />
         <AlertTitle>Could not load meetings</AlertTitle>
         <AlertDescription className="flex flex-col items-start gap-3">
-          <span>{error instanceof Error ? error.message : "Unknown error."}</span>
+          <span>
+            {error instanceof Error ? error.message : "Unknown error."}
+          </span>
           <Button size="sm" variant="outline" onClick={() => refetch()}>
             Retry
           </Button>
         </AlertDescription>
       </Alert>
-    )
+    );
   }
 
   if (data.items.length === 0) {
@@ -118,7 +125,7 @@ export function MeetingList({
           <Button onClick={onCreate}>Schedule one</Button>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -134,5 +141,5 @@ export function MeetingList({
         />
       ))}
     </div>
-  )
+  );
 }

@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { toast } from "sonner"
+import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -10,31 +10,35 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { useDeleteMeeting } from "@/hooks/use-meetings"
-import type { Meeting } from "@/lib/types"
+} from "@/components/ui/dialog";
+import { useDeleteMeeting } from "@/hooks/use-meetings";
+import type { Meeting } from "@/lib/types";
 
 export function DeleteMeetingDialog({
   meeting,
   open,
   onOpenChange,
 }: {
-  meeting?: Meeting
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  meeting?: Meeting;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const deleteMeeting = useDeleteMeeting()
+  const deleteMeeting = useDeleteMeeting();
 
   const onConfirm = async () => {
-    if (!meeting) return
+    if (!meeting) return;
     try {
-      await deleteMeeting.mutateAsync(meeting.id)
-      toast.success("Meeting deleted")
-      onOpenChange(false)
+      await deleteMeeting.mutateAsync(meeting.id);
+      toast.success("Meeting deleted");
+      onOpenChange(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not delete the meeting.")
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not delete the meeting.",
+      );
     }
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -42,8 +46,8 @@ export function DeleteMeetingDialog({
         <DialogHeader>
           <DialogTitle>Delete this meeting?</DialogTitle>
           <DialogDescription>
-            &ldquo;{meeting?.name}&rdquo; and its participant list will be removed. This
-            can&apos;t be undone.
+            &ldquo;{meeting?.name}&rdquo; and its participant list will be
+            removed. This can&apos;t be undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -60,5 +64,5 @@ export function DeleteMeetingDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

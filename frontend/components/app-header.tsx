@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { Plus } from "lucide-react"
+import { Plus } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -11,17 +11,17 @@ import {
   NavigationMenuLink,
   NavigationMenuList,
   NavigationMenuTrigger,
-} from "@/components/ui/navigation-menu"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { SiteHeader } from "@/components/site-header"
-import { UserMenu } from "@/components/user-menu"
-import { useMeetings } from "@/hooks/use-meetings"
-import { formatTimeRange } from "@/lib/datetime"
+} from "@/components/ui/navigation-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { SiteHeader } from "@/components/site-header";
+import { UserMenu } from "@/components/user-menu";
+import { useMeetings } from "@/hooks/use-meetings";
+import { formatTimeRange } from "@/lib/datetime";
 
 export function AppHeader({ onCreate }: { onCreate: () => void }) {
   // Same query key as the list, so a newly created meeting shows up here too.
-  const { data } = useMeetings()
-  const meetings = data?.items ?? []
+  const { data } = useMeetings();
+  const meetings = data?.items ?? [];
 
   return (
     <SiteHeader href="/today">
@@ -52,7 +52,10 @@ export function AppHeader({ onCreate }: { onCreate: () => void }) {
                             className="hover:bg-accent block rounded-2xl p-2.5 transition-colors"
                           >
                             <span className="text-muted-foreground font-mono text-xs tabular-nums">
-                              {formatTimeRange(meeting.starts_at, meeting.ends_at)}
+                              {formatTimeRange(
+                                meeting.starts_at,
+                                meeting.ends_at,
+                              )}
                             </span>
                             <span className="block truncate text-sm font-medium">
                               {meeting.name}
@@ -75,5 +78,5 @@ export function AppHeader({ onCreate }: { onCreate: () => void }) {
       </Button>
       <UserMenu />
     </SiteHeader>
-  )
+  );
 }

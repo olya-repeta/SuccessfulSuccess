@@ -1,10 +1,18 @@
-"use client"
+"use client";
 
-import { useRef } from "react"
-import { CalendarDays, Clock, Mail, MapPin, Pencil, Trash2, Users } from "lucide-react"
+import { useRef } from "react";
+import {
+  CalendarDays,
+  Clock,
+  Mail,
+  MapPin,
+  Pencil,
+  Trash2,
+  Users,
+} from "lucide-react";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -12,15 +20,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Separator } from "@/components/ui/separator"
+} from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import {
   formatDuration,
   formatLongDate,
   formatTimeRange,
   initials,
-} from "@/lib/datetime"
-import type { Meeting } from "@/lib/types"
+} from "@/lib/datetime";
+import type { Meeting } from "@/lib/types";
 
 export function MeetingDetailsDialog({
   meeting,
@@ -29,13 +37,13 @@ export function MeetingDetailsDialog({
   onEdit,
   onDelete,
 }: {
-  meeting?: Meeting
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onEdit: (meeting: Meeting) => void
-  onDelete: (meeting: Meeting) => void
+  meeting?: Meeting;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onEdit: (meeting: Meeting) => void;
+  onDelete: (meeting: Meeting) => void;
 }) {
-  const editRef = useRef<HTMLButtonElement>(null)
+  const editRef = useRef<HTMLButtonElement>(null);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -44,12 +52,14 @@ export function MeetingDetailsDialog({
           className="max-h-[90svh] overflow-y-auto sm:max-w-lg"
           // Focus Edit rather than the first button, so Enter never starts a delete.
           onOpenAutoFocus={(event) => {
-            event.preventDefault()
-            editRef.current?.focus()
+            event.preventDefault();
+            editRef.current?.focus();
           }}
         >
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold tracking-tight">{meeting.name}</DialogTitle>
+            <DialogTitle className="text-2xl font-bold tracking-tight">
+              {meeting.name}
+            </DialogTitle>
             <DialogDescription className="flex flex-wrap items-center gap-2 pt-1">
               <span className="tint-violet inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-xs font-semibold tabular-nums">
                 <Clock className="size-3.5" aria-hidden />
@@ -63,21 +73,30 @@ export function MeetingDetailsDialog({
 
           <dl className="grid gap-3 text-sm">
             <div className="flex items-center gap-2">
-              <CalendarDays className="text-muted-foreground size-4" aria-hidden />
+              <CalendarDays
+                className="text-muted-foreground size-4"
+                aria-hidden
+              />
               <dt className="sr-only">Date</dt>
               <dd>{formatLongDate(meeting.starts_at)}</dd>
             </div>
             <div className="flex items-center gap-2">
               <MapPin className="text-muted-foreground size-4" aria-hidden />
               <dt className="sr-only">Location</dt>
-              <dd className={meeting.location ? undefined : "text-muted-foreground"}>
+              <dd
+                className={
+                  meeting.location ? undefined : "text-muted-foreground"
+                }
+              >
                 {meeting.location ?? "No location"}
               </dd>
             </div>
           </dl>
 
           {meeting.description ? (
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">{meeting.description}</p>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">
+              {meeting.description}
+            </p>
           ) : null}
 
           <Separator />
@@ -91,7 +110,9 @@ export function MeetingDetailsDialog({
               </span>
             </h3>
             {meeting.participants.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No participants yet.</p>
+              <p className="text-muted-foreground text-sm">
+                No participants yet.
+              </p>
             ) : (
               <ul className="space-y-2">
                 {meeting.participants.map((participant) => (
@@ -102,7 +123,9 @@ export function MeetingDetailsDialog({
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{participant.name}</p>
+                      <p className="truncate text-sm font-medium">
+                        {participant.name}
+                      </p>
                       {participant.email ? (
                         <a
                           href={`mailto:${participant.email}`}
@@ -132,5 +155,5 @@ export function MeetingDetailsDialog({
         </DialogContent>
       ) : null}
     </Dialog>
-  )
+  );
 }

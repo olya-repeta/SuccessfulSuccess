@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: OpenID Connect provider and IAM Role for GitHub Actions deployment
+
+Parameters:
+  GitHubOrg:
+    Type: String
+    Description: GitHub organization or username (e.g. your-github-username)
+  GitHubRepo:
+    Type: String
+    Description: GitHub repository name (e.g. SuccessfulSuccess)
+
+Resources:
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+        - 1c3d597113a07971cc734704d32302263008305c
+
+  GitHubActionsDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GitHubActionsDeployRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDCProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/*"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+Outputs:
+  RoleArn:
+    Description: ARN of the IAM Role for GitHub Actions
+    Value: !GetAtt GitHubActionsDeployRole.Arn

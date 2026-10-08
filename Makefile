@@ -185,7 +185,8 @@ aws-auth-env: ## Print the Cognito settings to put in .env for local development
 		$$1 == "UserPoolId" { print "COGNITO_USER_POOL_ID=" $$2 } \
 		$$1 == "UserPoolClientId" { print "COGNITO_CLIENT_ID=" $$2 } \
 		$$1 == "HostedDomain" { print "COGNITO_DOMAIN=" $$2 } \
-		$$1 == "GoogleEnabled" { print "COGNITO_GOOGLE_ENABLED=" $$2 }' | tr -d '\r'
+		$$1 == "GoogleEnabled" { print "COGNITO_GOOGLE_ENABLED=" $$2 } \
+		$$1 == "Issuer" { print "COGNITO_AUTHORITY=" $$2 }' | tr -d '\r'
 
 aws-ecr: ## Create the ECR repository for the backend image
 	$(require-aws-credentials)
@@ -317,6 +318,7 @@ aws-deploy-frontend: ## Deploy the frontend to S3 + CloudFront, built against th
 		auth_out() { printf '%s\n' "$$auth" | awk -F '\t' -v k="$$1" '$$1 == k { print $$2 }'; }; \
 		bucket=$$($(call stack-output,$(FRONTEND_STACK),BucketName) | tr -d '[:space:]'); \
 		dist=$$($(call stack-output,$(FRONTEND_STACK),DistributionId) | tr -d '[:space:]'); \
+		site=$$($(call stack-output,$(FRONTEND_STACK),SiteUrl) | tr -d '[:space:]'); \
 		echo "Building the static export against $$api"; \
 		rm -rf frontend/out; \
 		docker build --target export --output type=local,dest=frontend/out \
@@ -325,6 +327,8 @@ aws-deploy-frontend: ## Deploy the frontend to S3 + CloudFront, built against th
 			--build-arg NEXT_PUBLIC_COGNITO_CLIENT_ID="$$(auth_out UserPoolClientId)" \
 			--build-arg NEXT_PUBLIC_COGNITO_DOMAIN="$$(auth_out HostedDomain)" \
 			--build-arg NEXT_PUBLIC_COGNITO_GOOGLE_ENABLED="$$(auth_out GoogleEnabled)" \
+			--build-arg NEXT_PUBLIC_COGNITO_AUTHORITY="$$(auth_out Issuer)" \
+			--build-arg NEXT_PUBLIC_COGNITO_REDIRECT_URI="$$site/" \
 			./frontend || exit 1; \
 		echo "Uploading to s3://$$bucket"; \
 		$(AWS) s3 sync frontend/out "s3://$$bucket" --delete --exclude "*.html" \

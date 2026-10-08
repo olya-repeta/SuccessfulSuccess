@@ -1,8 +1,7 @@
 "use client";
 
 import { LogOut } from "lucide-react";
-
-import { useAuth } from "@/components/auth-provider";
+import { useAuth } from "react-oidc-context";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,12 +13,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { initials } from "@/lib/datetime";
+import { signOut } from "@/lib/auth";
 
 export function UserMenu() {
-  const { user, signOut } = useAuth();
+  const auth = useAuth();
+  const user = auth.user;
   if (!user) return null;
 
-  const label = user.name ?? user.email ?? "Account";
+  const email = user.profile.email;
+  const name = user.profile.name;
+  const label = name ?? email ?? "Account";
 
   return (
     <DropdownMenu>
@@ -32,7 +35,7 @@ export function UserMenu() {
         >
           <Avatar className="size-9">
             <AvatarFallback className="tint-violet text-xs font-semibold">
-              {initials(user.name ?? user.email?.split("@")[0] ?? "?")}
+              {initials(name ?? email?.split("@")[0] ?? "?")}
             </AvatarFallback>
           </Avatar>
         </Button>
@@ -40,14 +43,14 @@ export function UserMenu() {
       <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuLabel className="font-normal">
           <p className="truncate text-sm font-semibold">{label}</p>
-          {user.email && user.email !== label ? (
+          {email && email !== label ? (
             <p className="text-muted-foreground truncate text-xs">
-              {user.email}
+              {email}
             </p>
           ) : null}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => void signOut()}>
+        <DropdownMenuItem onSelect={() => void signOut(() => auth.removeUser())}>
           <LogOut aria-hidden />
           Sign out
         </DropdownMenuItem>

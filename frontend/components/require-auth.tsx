@@ -3,8 +3,7 @@
 import { CalendarDays } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-
-import { useAuth } from "@/components/auth-provider";
+import { useAuth } from "react-oidc-context";
 
 /** Full-screen placeholder while the session is checked or the redirect happens. */
 export function AuthLoading({
@@ -34,17 +33,19 @@ export function AuthLoading({
 
 /** Renders its children only for a signed-in user; everyone else goes to the login page. */
 export function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { status } = useAuth();
+  const auth = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (status === "signedOut") router.replace("/");
-  }, [status, router]);
+    if (!auth.isLoading && !auth.isAuthenticated) {
+      router.replace("/login/");
+    }
+  }, [auth.isLoading, auth.isAuthenticated, router]);
 
-  if (status !== "signedIn") {
+  if (auth.isLoading || !auth.isAuthenticated) {
     return (
       <AuthLoading
-        label={status === "loading" ? undefined : "Redirecting to sign in…"}
+        label={auth.isLoading ? undefined : "Redirecting to sign in…"}
       />
     );
   }

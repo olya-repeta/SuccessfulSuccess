@@ -1,6 +1,4 @@
-import { signOut } from "aws-amplify/auth";
-
-import { getAccessToken } from "@/lib/auth";
+import { getAccessToken, signOut } from "@/lib/auth";
 import type {
   ApiErrorBody,
   ApiErrorDetail,

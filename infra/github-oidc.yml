@@ -4,7 +4,7 @@ Description: OpenID Connect provider and IAM Role for GitHub Actions deployment
 Parameters:
   GitHubOrg:
     Type: String
-    Description: GitHub organization or username (e.g. your-github-username)
+    Description: GitHub organization or username (e.g. olya-repeta)
   GitHubRepo:
     Type: String
     Description: GitHub repository name (e.g. SuccessfulSuccess)
@@ -35,7 +35,7 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/*"
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}/${GitHubRepo}:*"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AdministratorAccess
 

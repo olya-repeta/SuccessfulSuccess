@@ -338,6 +338,9 @@ Outputs:
   DatabaseEndpoint:
     Description: Aurora cluster (writer) endpoint, private to the VPC
     Value: !GetAtt DbCluster.Endpoint.Address
+  FunctionSecurityGroupId:
+    Description: Security group attached to the backend function
+    Value: !Ref FunctionSecurityGroup
   FunctionName:
     Value: !Ref ApiFunction
   LogGroupName:

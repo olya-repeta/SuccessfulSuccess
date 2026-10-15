@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     # empty they are fetched from Cognito on first use.
     cognito_jwks: str = ""
 
+    @field_validator("database_url")
+    @classmethod
+    def _validate_database_url(cls, value: str) -> str:
+        return value.strip()
+
     @field_validator("app_timezone")
     @classmethod
     def _validate_timezone(cls, value: str) -> str:

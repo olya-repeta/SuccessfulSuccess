@@ -94,7 +94,7 @@ endef
 
 .PHONY: help up up-build down down-v logs ps migrate revision seed test lint fmt shell-backend psql \
         aws-whoami aws-deploy aws-deploy-auth aws-auth-env aws-ecr aws-push aws-deploy-backend aws-migrate aws-url aws-status aws-logs \
-        aws-frontend-cert aws-deploy-frontend aws-frontend-url aws-destroy
+        aws-frontend-cert aws-deploy-frontend aws-frontend-url aws-destroy aws-deploy-reports report-now
 
 help:
 	@grep -hE '^[a-z-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -256,6 +256,66 @@ aws-deploy-backend: aws-push ## Deploy the backend to AWS (Lambda function URL +
 	@$(MAKE) --no-print-directory aws-migrate
 	@$(MAKE) --no-print-directory aws-url
 
+REPORTS_STACK ?= $(PROJECT_NAME)-reports
+
+aws-deploy-reports: ## Deploy the reports stack (SQS, Scheduler, S3 Bucket, Lambda Builder/Mailer, SES)
+	$(require-aws-credentials)
+	@vpc=$$($(AWS) ec2 describe-vpcs --filters Name=isDefault,Values=true \
+		--query 'Vpcs[0].VpcId' --output text 2>/dev/null | tr -d '[:space:]'); \
+		test -n "$$vpc" -a "$$vpc" != "None" || { \
+			echo "No default VPC found in $(AWS_REGION) — check AWS configuration"; exit 1; }; \
+		subnets=$$($(AWS) ec2 describe-subnets \
+			--filters Name=vpc-id,Values=$$vpc Name=default-for-az,Values=true \
+			--query 'Subnets[].SubnetId' --output text 2>/dev/null | tr '[:space:]' ',' | sed 's/,*$$//' | tr -d '[:space:]'); \
+		test -n "$$subnets" || { echo "No default subnets found in VPC $$vpc"; exit 1; }; \
+		route_tables=$$($(AWS) ec2 describe-route-tables --filters Name=vpc-id,Values=$$vpc \
+			--query 'RouteTables[].RouteTableId' --output text 2>/dev/null | tr '[:space:]' ',' | sed 's/,*$$//' | tr -d '[:space:]'); \
+		test -n "$$route_tables" || { echo "No route tables found for VPC $$vpc"; exit 1; }; \
+		sg=$$($(call stack-output,$(APP_STACK),FunctionSecurityGroupId) 2>/dev/null | tr -d '[:space:]'); \
+		if [ -z "$$sg" ] || [ "$$sg" = "None" ]; then \
+			sg=$$($(AWS) ec2 describe-security-groups --filters Name=vpc-id,Values=$$vpc Name=tag:Name,Values=$(PROJECT_NAME)-function \
+				--query 'SecurityGroups[0].GroupId' --output text 2>/dev/null | tr -d '[:space:]'); \
+		fi; \
+		if [ -z "$$sg" ] || [ "$$sg" = "None" ]; then \
+			sg=$$($(AWS) ec2 describe-security-groups --filters Name=vpc-id,Values=$$vpc Name=group-name,Values=default \
+				--query 'SecurityGroups[0].GroupId' --output text 2>/dev/null | tr -d '[:space:]'); \
+		fi; \
+		test -n "$$sg" || { echo "No security group found in VPC $$vpc"; exit 1; }; \
+		repo=$$($(call stack-output,$(ECR_STACK),RepositoryUri) 2>/dev/null | tr -d '[:space:]'); \
+		test -n "$$repo" -a "$$repo" != "None" || { echo "No ECR repository found — run: make aws-ecr"; exit 1; }; \
+		digest=$$($(AWS) ecr describe-images --repository-name "$${repo#*/}" \
+			--image-ids imageTag=$(IMAGE_TAG) --query 'imageDetails[0].imageDigest' \
+			--output text 2>/dev/null | tr -d '[:space:]'); \
+		test -n "$$digest" -a "$$digest" != "None" || { echo "No image digest found for $(IMAGE_TAG) — run: make aws-push"; exit 1; }; \
+		pass=$$(grep AWS_DB_PASSWORD .env 2>/dev/null | cut -d '=' -f2 | tr -d '\r\n[:space:]'); \
+		test -n "$$pass" || { echo "AWS_DB_PASSWORD is empty in .env"; exit 1; }; \
+		endpoint=$$($(call stack-output,$(APP_STACK),DatabaseEndpoint) 2>/dev/null | tr -d '\r\n[:space:]'); \
+		test -n "$$endpoint" -a "$$endpoint" != "None" || { echo "No DatabaseEndpoint found — run: make aws-deploy-backend"; exit 1; }; \
+		db_name=$$(grep POSTGRES_DB .env 2>/dev/null | cut -d '=' -f2 | tr -d '\r\n[:space:]'); \
+		db_name="$${db_name:-meetings}"; \
+		db_user=$$(grep POSTGRES_USER .env 2>/dev/null | cut -d '=' -f2 | tr -d '\r\n[:space:]'); \
+		db_user="$${db_user:-app}"; \
+		db_url=$$(echo "postgresql+asyncpg://$${db_user}:$${pass}@$${endpoint}:5432/$${db_name}" | tr -d '[:space:]'); \
+		reports_bucket=$$(echo "$(REPORTS_BUCKET)" | tr -d '[:space:]'); \
+		echo "Deploying reports stack with VPC=$$vpc Subnets=$$subnets RouteTables=$$route_tables SG=$$sg Image=$$repo@$$digest"; \
+		$(call wait-stack-idle,$(REPORTS_STACK)); \
+		$(call clear-failed-create,$(REPORTS_STACK)); \
+		$(AWS) cloudformation deploy \
+			--stack-name $(REPORTS_STACK) \
+			--template-file infra/reports.yml \
+			--capabilities CAPABILITY_IAM \
+			--no-fail-on-empty-changeset \
+			$(STACK_TAGS) \
+			--parameter-overrides \
+				"ProjectName=$(PROJECT_NAME)" \
+				"VpcId=$$vpc" \
+				"SubnetIds=$$subnets" \
+				"RouteTableIds=$$route_tables" \
+				"SecurityGroupId=$$sg" \
+				"ImageUri=$$repo@$$digest" \
+				"DatabaseUrl=$$db_url" \
+				"ReportsBucketName=$$reports_bucket"
+
 aws-migrate: ## Apply database migrations (invokes the backend function directly)
 	@fn=$$($(call stack-output,$(APP_STACK),FunctionName) | tr -d '[:space:]'); \
 		echo "Migrating ($$fn)"; \
@@ -277,6 +337,23 @@ aws-status: ## Show the stack outputs and the API function's state
 
 aws-logs: ## Follow the backend function logs
 	$(AWS) logs tail /aws/lambda/$(PROJECT_NAME)-backend --follow
+
+report-now: ## Send a manual report request to the SQS queue: make report-now [WEEK=YYYY-Www]
+	$(require-aws-credentials)
+	@queue_url=$$($(AWS) sqs get-queue-url --queue-name report-requests --query 'QueueUrl' --output text 2>/dev/null | tr -d '[:space:]'); \
+		test -n "$$queue_url" || { echo "Queue report-requests not found — run: make aws-deploy-reports"; exit 1; }; \
+		week=$$(echo "$(WEEK)" | tr -d '[:space:]'); \
+		if [ -n "$$week" ]; then \
+			body="{\"week\": \"$$week\", \"source\": \"manual\"}"; \
+		else \
+			body='{"week": null, "source": "manual"}'; \
+		fi; \
+		echo "Sending report request ($$body) to $$queue_url"; \
+		msg_id=$$($(AWS) sqs send-message \
+			--queue-url "$$queue_url" \
+			--message-body "$$body" \
+			--query 'MessageId' --output text | tr -d '[:space:]'); \
+		echo "Enqueued report request message: $$msg_id"
 
 aws-frontend-cert: ## Request and validate the HTTPS certificate for AWS_FRONTEND_DOMAIN (in us-east-1)
 	$(require-aws-credentials)

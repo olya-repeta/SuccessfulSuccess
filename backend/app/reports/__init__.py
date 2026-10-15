@@ -1,0 +1,1 @@
+"""Weekly meetings report module."""

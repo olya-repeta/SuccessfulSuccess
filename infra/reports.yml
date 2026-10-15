@@ -45,12 +45,12 @@ Parameters:
     Default: INFO
     AllowedValues: [DEBUG, INFO, WARNING, ERROR]
 
-  ReportSenderEmail:
+  SenderEmail:
     Type: String
     Default: reports@successfulsuccess.org
     Description: SES verified sender email address.
 
-  ReportRecipientEmail:
+  RecipientEmail:
     Type: String
     Default: team@successfulsuccess.org
     Description: Recipient email address for the weekly report.
@@ -62,6 +62,7 @@ Parameters:
 
 Conditions:
   HasReportsBucketName: !Not [!Equals [!Ref ReportsBucketName, ""]]
+  HasDistinctRecipientEmail: !Not [!Equals [!Ref RecipientEmail, !Ref SenderEmail]]
 
 Resources:
   # ============================================================================
@@ -300,8 +301,10 @@ Resources:
       MemorySize: 256
       Environment:
         Variables:
-          REPORT_SENDER_EMAIL: !Ref ReportSenderEmail
-          REPORT_RECIPIENT_EMAIL: !Ref ReportRecipientEmail
+          SENDER_EMAIL: !Ref SenderEmail
+          RECIPIENT_EMAIL: !Ref RecipientEmail
+          REPORT_SENDER_EMAIL: !Ref SenderEmail
+          REPORT_RECIPIENT_EMAIL: !Ref RecipientEmail
       Code:
         ZipFile: |
           import json
@@ -338,8 +341,16 @@ Resources:
               response = s3_client.get_object(Bucket=bucket, Key=key)
               csv_bytes = response["Body"].read()
 
-              sender = os.environ.get("REPORT_SENDER_EMAIL", "reports@example.com").strip()
-              recipient_env = os.environ.get("REPORT_RECIPIENT_EMAIL", sender).strip()
+              sender = (
+                  os.environ.get("SENDER_EMAIL")
+                  or os.environ.get("REPORT_SENDER_EMAIL")
+                  or "reports@example.com"
+              ).strip()
+              recipient_env = (
+                  os.environ.get("RECIPIENT_EMAIL")
+                  or os.environ.get("REPORT_RECIPIENT_EMAIL")
+                  or sender
+              ).strip()
               recipients = [r.strip() for r in recipient_env.split(",") if r.strip()]
 
               msg = EmailMessage()
@@ -389,12 +400,13 @@ Resources:
   SenderEmailIdentity:
     Type: AWS::SES::EmailIdentity
     Properties:
-      EmailIdentity: !Ref ReportSenderEmail
+      EmailIdentity: !Ref SenderEmail
 
   RecipientEmailIdentity:
     Type: AWS::SES::EmailIdentity
+    Condition: HasDistinctRecipientEmail
     Properties:
-      EmailIdentity: !Ref ReportRecipientEmail
+      EmailIdentity: !Ref RecipientEmail
 
 Outputs:
   ReportsBucketName:
@@ -432,3 +444,11 @@ Outputs:
   S3GatewayEndpointId:
     Description: ID of the S3 Gateway VPC Endpoint
     Value: !Ref S3Endpoint
+
+  SenderEmail:
+    Description: SES verified sender email address
+    Value: !Ref SenderEmail
+
+  RecipientEmail:
+    Description: Recipient email address for weekly reports
+    Value: !Ref RecipientEmail

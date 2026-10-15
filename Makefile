@@ -257,6 +257,8 @@ aws-deploy-backend: aws-push ## Deploy the backend to AWS (Lambda function URL +
 	@$(MAKE) --no-print-directory aws-url
 
 REPORTS_STACK ?= $(PROJECT_NAME)-reports
+SENDER_EMAIL ?= repeta.pn@ucu.edu.ua
+RECIPIENT_EMAIL ?= repeta.pn@ucu.edu.ua
 
 aws-deploy-reports: ## Deploy the reports stack (SQS, Scheduler, S3 Bucket, Lambda Builder/Mailer, SES)
 	$(require-aws-credentials)
@@ -297,7 +299,23 @@ aws-deploy-reports: ## Deploy the reports stack (SQS, Scheduler, S3 Bucket, Lamb
 		db_user="$${db_user:-app}"; \
 		db_url=$$(echo "postgresql+asyncpg://$${db_user}:$${pass}@$${endpoint}:5432/$${db_name}" | tr -d '[:space:]'); \
 		reports_bucket=$$(echo "$(REPORTS_BUCKET)" | tr -d '[:space:]'); \
-		echo "Deploying reports stack with VPC=$$vpc Subnets=$$subnets RouteTables=$$route_tables SG=$$sg Image=$$repo@$$digest"; \
+		sender_email=$$(echo "$(SENDER_EMAIL)" | tr -d '[:space:]'); \
+		if [ -z "$$sender_email" ]; then \
+			sender_email=$$(grep -E '^(SENDER_EMAIL|REPORT_SENDER_EMAIL)=' .env 2>/dev/null | tail -n 1 | cut -d '=' -f2- | tr -d '[:space:]'); \
+		fi; \
+		if [ -z "$$sender_email" ]; then \
+			sender_email=$$(echo "$$SENDER_EMAIL" | tr -d '[:space:]'); \
+		fi; \
+		sender_email="$${sender_email:-reports@successfulsuccess.org}"; \
+		recipient_email=$$(echo "$(RECIPIENT_EMAIL)" | tr -d '[:space:]'); \
+		if [ -z "$$recipient_email" ]; then \
+			recipient_email=$$(grep -E '^(RECIPIENT_EMAIL|REPORT_RECIPIENT_EMAIL)=' .env 2>/dev/null | tail -n 1 | cut -d '=' -f2- | tr -d '[:space:]'); \
+		fi; \
+		if [ -z "$$recipient_email" ]; then \
+			recipient_email=$$(echo "$$RECIPIENT_EMAIL" | tr -d '[:space:]'); \
+		fi; \
+		recipient_email="$${recipient_email:-team@successfulsuccess.org}"; \
+		echo "Deploying reports stack with VPC=$$vpc Subnets=$$subnets RouteTables=$$route_tables SG=$$sg Image=$$repo@$$digest Sender=$$sender_email Recipient=$$recipient_email"; \
 		$(call wait-stack-idle,$(REPORTS_STACK)); \
 		$(call clear-failed-create,$(REPORTS_STACK)); \
 		$(AWS) cloudformation deploy \
@@ -314,7 +332,9 @@ aws-deploy-reports: ## Deploy the reports stack (SQS, Scheduler, S3 Bucket, Lamb
 				"SecurityGroupId=$$sg" \
 				"ImageUri=$$repo@$$digest" \
 				"DatabaseUrl=$$db_url" \
-				"ReportsBucketName=$$reports_bucket"
+				"ReportsBucketName=$$reports_bucket" \
+				"SenderEmail=$$sender_email" \
+				"RecipientEmail=$$recipient_email"
 
 aws-migrate: ## Apply database migrations (invokes the backend function directly)
 	@fn=$$($(call stack-output,$(APP_STACK),FunctionName) | tr -d '[:space:]'); \
@@ -337,6 +357,9 @@ aws-status: ## Show the stack outputs and the API function's state
 
 aws-logs: ## Follow the backend function logs
 	$(AWS) logs tail /aws/lambda/$(PROJECT_NAME)-backend --follow
+
+aws-reports-logs: ## Follow the reports mailer function logs
+	$(AWS) logs tail /aws/lambda/$(PROJECT_NAME)-report-mailer --follow
 
 report-now: ## Send a manual report request to the SQS queue: make report-now [WEEK=YYYY-Www]
 	$(require-aws-credentials)

@@ -66,8 +66,16 @@ def handler(event, context):
     response = s3.get_object(Bucket=bucket, Key=key)
     csv_bytes = response["Body"].read()
 
-    sender = os.environ.get("REPORT_SENDER_EMAIL", "reports@example.com").strip()
-    recipient_env = os.environ.get("REPORT_RECIPIENT_EMAIL", sender).strip()
+    sender = (
+        os.environ.get("SENDER_EMAIL")
+        or os.environ.get("REPORT_SENDER_EMAIL")
+        or "reports@example.com"
+    ).strip()
+    recipient_env = (
+        os.environ.get("RECIPIENT_EMAIL")
+        or os.environ.get("REPORT_RECIPIENT_EMAIL")
+        or sender
+    ).strip()
     recipients = [r.strip() for r in recipient_env.split(",") if r.strip()]
 
     # Construct raw email with attachment

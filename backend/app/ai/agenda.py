@@ -43,6 +43,8 @@ class AgendaParseError(Exception):
     """Raised when the LLM fails to return a valid agenda."""
 
 
+PROMPT_VERSION = "agenda-v1"
+
 RECORD_AGENDA = {
     "name": "record_agenda",
     "description": (

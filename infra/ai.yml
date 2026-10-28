@@ -1,0 +1,178 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  AI Agenda Parser service: a serverless Lambda function (reusing the backend container image)
+  behind a public Function URL with CORS, invoking Claude via Bedrock Mantle / Amazon Bedrock.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: successfulsuccess
+    Description: Prefix for resource names and tags.
+
+  ImageUri:
+    Type: String
+    Description: >-
+      Backend Docker image URI, pinned by digest or tag:
+      <account>.dkr.ecr.<region>.amazonaws.com/<repo>@sha256:...
+
+  Architecture:
+    Type: String
+    Default: x86_64
+    AllowedValues: [x86_64, arm64]
+    Description: Architecture the container image was built for.
+
+  ParserModel:
+    Type: String
+    Default: anthropic.claude-opus-5-5
+    Description: Claude model ID to invoke on Bedrock Mantle.
+
+  CorsOrigins:
+    Type: String
+    Default: "*"
+    Description: Comma-separated list of origins allowed to call the function URL.
+
+  CognitoUserPoolId:
+    Type: String
+    Default: ""
+    Description: Cognito User Pool ID for verifying access tokens.
+
+  CognitoClientId:
+    Type: String
+    Default: ""
+    Description: Cognito App Client ID.
+
+  CognitoJwks:
+    Type: String
+    Default: ""
+    Description: Public signing keys for the Cognito user pool (raw JSON or base64).
+
+  AppTimezone:
+    Type: String
+    Default: Europe/Kyiv
+    Description: Default timezone for relative date parsing.
+
+Resources:
+  # --- IAM Role ---------------------------------------------------------------
+
+  AiFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-ai-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BedrockMantleInferencePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock-mantle:CreateInference
+                  - bedrock:InvokeModel
+                Resource: "*"
+      Tags:
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  # --- CloudWatch Log Group ---------------------------------------------------
+
+  AiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ProjectName}-ai"
+      RetentionInDays: 7
+      Tags:
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  # --- Lambda Function (Outside VPC) ------------------------------------------
+
+  AiFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-ai"
+      Description: AI Agenda parser using Anthropic Claude via Bedrock Mantle
+      PackageType: Image
+      Code:
+        ImageUri: !Ref ImageUri
+      ImageConfig:
+        Command:
+          - app.ai.agenda_lambda.handler
+      Architectures:
+        - !Ref Architecture
+      Role: !GetAtt AiFunctionRole.Arn
+      MemorySize: 512
+      Timeout: 30
+      LoggingConfig:
+        LogGroup: !Ref AiLogGroup
+      Environment:
+        Variables:
+          PARSER_MODEL: !Ref ParserModel
+          COGNITO_REGION: !Ref AWS::Region
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
+          COGNITO_CLIENT_ID: !Ref CognitoClientId
+          COGNITO_JWKS: !Ref CognitoJwks
+          APP_TIMEZONE: !Ref AppTimezone
+          CORS_ORIGINS: !Ref CorsOrigins
+      Tags:
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  # --- Function URL -----------------------------------------------------------
+
+  FunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt AiFunction.Arn
+      AuthType: NONE
+      InvokeMode: BUFFERED
+      Cors:
+        AllowCredentials: false
+        AllowHeaders:
+          - authorization
+          - content-type
+        AllowMethods:
+          - POST
+          - OPTIONS
+        AllowOrigins: !Split [",", !Ref CorsOrigins]
+        MaxAge: 3600
+
+  FunctionUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AiFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+
+  FunctionUrlInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AiFunction
+      Action: lambda:InvokeFunction
+      Principal: "*"
+      InvokedViaFunctionUrl: true
+
+Outputs:
+  FunctionUrl:
+    Description: Direct Function URL endpoint
+    Value: !GetAtt FunctionUrl.FunctionUrl
+  ApiUrl:
+    Description: Base Function URL without trailing slash
+    Value: !Sub ["https://${Host}", {Host: !Select [2, !Split ["/", !GetAtt FunctionUrl.FunctionUrl]]}]
+  FunctionName:
+    Description: Lambda Function Name
+    Value: !Ref AiFunction
+  FunctionArn:
+    Description: Lambda Function ARN
+    Value: !GetAtt AiFunction.Arn
+  FunctionRoleArn:
+    Description: IAM Role ARN
+    Value: !GetAtt AiFunctionRole.Arn

@@ -3,12 +3,12 @@
 from functools import lru_cache
 from zoneinfo import ZoneInfo
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=(".env", "../.env"), extra="ignore")
 
     database_url: str = "postgresql+asyncpg://app:app@db:5432/meetings"
     app_timezone: str = "Europe/Kyiv"
@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     run_migrations_on_start: bool = True
     version: str = Field(default="1.0.0")
+
+    # LLM parser model for Bedrock Mantle
+    parser_model: str = Field(
+        default="anthropic.claude-opus-5-5",
+        validation_alias=AliasChoices("PARSER_MODEL", "parser_model"),
+    )
 
     # Cognito user pool whose access tokens the API accepts. Empty pool id means
     # authentication is not configured, and every meetings request is refused.
@@ -51,6 +57,10 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def PARSER_MODEL(self) -> str:
+        return self.parser_model
 
 
 @lru_cache

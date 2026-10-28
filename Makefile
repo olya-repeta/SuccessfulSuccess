@@ -92,7 +92,7 @@ define require-db-password
 		exit 1; }
 endef
 
-.PHONY: help up up-build down down-v logs ps migrate revision seed test lint fmt shell-backend psql \
+.PHONY: help up up-build down down-v logs ps migrate revision seed test lint fmt shell-backend psql llm-hello \
         aws-whoami aws-deploy aws-deploy-auth aws-auth-env aws-ecr aws-push aws-deploy-backend aws-migrate aws-url aws-status aws-logs \
         aws-frontend-cert aws-deploy-frontend aws-frontend-url aws-destroy aws-deploy-reports report-now
 
@@ -126,6 +126,26 @@ revision: ## Autogenerate a migration: make revision m="add column"
 seed: ## Insert demo meetings for today for one user: make seed owner=<cognito-sub>
 	@test -n "$(owner)" || { echo "Usage: make seed owner=<cognito-sub> (the user's sub from the Cognito console)"; exit 1; }
 	$(COMPOSE) exec backend python -m app.seed "$(owner)"
+
+llm-hello: ## Send a test message to Bedrock Mantle: make llm-hello [model=<model-id>]
+	@m="$(or $(model),$(MODEL),$(PARSER_MODEL))"; \
+	if $(COMPOSE) ps --status running -q backend >/dev/null 2>&1 && [ -n "$$($(COMPOSE) ps --status running -q backend)" ]; then \
+		$(COMPOSE) exec \
+			-e AWS_ACCESS_KEY_ID="$(AWS_ACCESS_KEY_ID)" \
+			-e AWS_SECRET_ACCESS_KEY="$(AWS_SECRET_ACCESS_KEY)" \
+			-e AWS_SESSION_TOKEN="$(AWS_SESSION_TOKEN)" \
+			-e AWS_REGION="$(AWS_REGION)" \
+			$${m:+-e PARSER_MODEL="$$m"} \
+			backend python -m app.llm_hello $${m:+--model "$$m"}; \
+	else \
+		$(COMPOSE) run --rm --no-deps \
+			-e AWS_ACCESS_KEY_ID="$(AWS_ACCESS_KEY_ID)" \
+			-e AWS_SECRET_ACCESS_KEY="$(AWS_SECRET_ACCESS_KEY)" \
+			-e AWS_SESSION_TOKEN="$(AWS_SESSION_TOKEN)" \
+			-e AWS_REGION="$(AWS_REGION)" \
+			$${m:+-e PARSER_MODEL="$$m"} \
+			backend python -m app.llm_hello $${m:+--model "$$m"}; \
+	fi
 
 test: ## Run the backend test suite against a throwaway database
 	$(COMPOSE) exec db psql -U app -d postgres -tc \

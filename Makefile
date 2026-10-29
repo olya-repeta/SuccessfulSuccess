@@ -501,15 +501,17 @@ aws-deploy-frontend: ## Deploy the frontend to S3 + CloudFront, built against th
 	@# Now that the site's URL exists, let Cognito redirect back to it.
 	@$(MAKE) --no-print-directory aws-deploy-auth
 	@api=$$($(call stack-output,$(APP_STACK),ApiUrl) | tr -d '[:space:]'); \
+		ai_url=$$($(call stack-output,$(AI_STACK),FunctionUrl) 2>/dev/null | tr -d '[:space:]'); \
 		auth=$$($(call stack-outputs,$(AUTH_STACK)) | tr -d '\r'); \
 		auth_out() { printf '%s\n' "$$auth" | awk -F '\t' -v k="$$1" '$$1 == k { print $$2 }'; }; \
 		bucket=$$($(call stack-output,$(FRONTEND_STACK),BucketName) | tr -d '[:space:]'); \
 		dist=$$($(call stack-output,$(FRONTEND_STACK),DistributionId) | tr -d '[:space:]'); \
 		site=$$($(call stack-output,$(FRONTEND_STACK),SiteUrl) | tr -d '[:space:]'); \
-		echo "Building the static export against $$api"; \
+		echo "Building the static export against $$api (AI Parser: $$ai_url)"; \
 		rm -rf frontend/out; \
 		docker build --target export --output type=local,dest=frontend/out \
 			--build-arg NEXT_PUBLIC_API_BASE_URL="$$api" \
+			--build-arg NEXT_PUBLIC_AGENDA_PARSER_URL="$$ai_url" \
 			--build-arg NEXT_PUBLIC_COGNITO_USER_POOL_ID="$$(auth_out UserPoolId)" \
 			--build-arg NEXT_PUBLIC_COGNITO_CLIENT_ID="$$(auth_out UserPoolClientId)" \
 			--build-arg NEXT_PUBLIC_COGNITO_DOMAIN="$$(auth_out HostedDomain)" \

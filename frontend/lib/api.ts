@@ -190,11 +190,11 @@ export async function parseAgenda(params: {
   }
 
   if (response.status === 401) {
-    void signOut();
+    // void signOut(); <-- Disabled to prevent logging out user on AI parser auth issues
     throw new ApiError(
       401,
       "unauthorized",
-      "Your session has expired. Please sign in again.",
+      "AI Parser authorization failed.",
       [],
     );
   }

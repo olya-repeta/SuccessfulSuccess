@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import (
     BaseModel,
@@ -47,6 +48,7 @@ class MeetingCreate(BaseModel):
     starts_at: datetime
     ends_at: datetime
     participants: list[ParticipantCreate] = Field(default_factory=list)
+    ai_suggestion: dict[str, Any] | None = None
 
     @field_validator("name")
     @classmethod
@@ -105,6 +107,7 @@ class MeetingRead(BaseModel):
     participants: list[ParticipantRead]
     created_at: datetime
     updated_at: datetime
+    ai_suggestion: dict[str, Any] | None = None
 
     @field_serializer("starts_at", "ends_at", "created_at", "updated_at")
     def _in_app_timezone(self, value: datetime) -> str:

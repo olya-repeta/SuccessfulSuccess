@@ -1,5 +1,38 @@
 // Mirrors the Pydantic schemas in backend/app/schemas/meeting.py.
 
+export type AgendaItem = {
+  topic: string;
+  owner?: string | null;
+  minutes?: number | null;
+};
+
+export type ActionItem = {
+  task: string;
+  owner?: string | null;
+  due?: string | null;
+};
+
+export type ParsedAgenda = {
+  title?: string | null;
+  starts_at?: string | null;
+  duration_minutes?: number | null;
+  items: AgendaItem[];
+  action_items?: ActionItem[];
+  language: string;
+};
+
+export type AiSuggestion = {
+  agenda: ParsedAgenda | Record<string, unknown>;
+  model: string;
+  prompt_version: string;
+};
+
+export type AgendaParseResponse = {
+  agenda: ParsedAgenda;
+  model: string;
+  prompt_version: string;
+};
+
 export type Participant = {
   id: string;
   name: string;
@@ -17,6 +50,7 @@ export type Meeting = {
   participants: Participant[];
   created_at: string;
   updated_at: string;
+  ai_suggestion?: AiSuggestion | null;
 };
 
 export type MeetingList = {
@@ -39,6 +73,7 @@ export type MeetingCreateInput = {
   starts_at: string;
   ends_at: string;
   participants: ParticipantInput[];
+  ai_suggestion?: AiSuggestion | null;
 };
 
 export type ApiErrorDetail = {

@@ -23,11 +23,11 @@ Parameters:
 
   ParserModel:
     Type: String
-    Default: anthropic.claude-opus-5-5
+    Default: us.anthropic.claude-opus-4-6-v1
     Description: Claude model ID to invoke on Bedrock Mantle.
 
   CorsOrigins:
-    Type: String
+    Type: CommaDelimitedList
     Default: "*"
     Description: Comma-separated list of origins allowed to call the function URL.
 
@@ -120,7 +120,7 @@ Resources:
           COGNITO_CLIENT_ID: !Ref CognitoClientId
           COGNITO_JWKS: !Ref CognitoJwks
           APP_TIMEZONE: !Ref AppTimezone
-          CORS_ORIGINS: !Ref CorsOrigins
+          CORS_ORIGINS: !Join [",", !Ref CorsOrigins]
       Tags:
         - Key: PROJECT_NAME
           Value: !Ref ProjectName
@@ -134,14 +134,12 @@ Resources:
       AuthType: NONE
       InvokeMode: BUFFERED
       Cors:
-        AllowCredentials: false
         AllowHeaders:
           - authorization
           - content-type
         AllowMethods:
           - POST
-          - OPTIONS
-        AllowOrigins: !Split [",", !Ref CorsOrigins]
+        AllowOrigins: !Ref CorsOrigins
         MaxAge: 3600
 
   FunctionUrlPermission:

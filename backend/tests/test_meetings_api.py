@@ -115,6 +115,42 @@ async def test_update_rejects_end_before_start(client, meeting_payload):
     assert response.status_code == 422
 
 
+async def test_create_and_update_with_ai_suggestion(client, meeting_payload):
+    suggestion = {
+        "agenda": {
+            "title": "Sprint planning",
+            "starts_at": "2026-09-10T10:00:00+03:00",
+            "duration_minutes": 60,
+            "items": [{"topic": "Planning", "owner": "Ostap", "minutes": 30}],
+            "action_items": [],
+            "language": "en",
+        },
+        "model": "us.anthropic.claude-opus-4-6-v1",
+        "prompt_version": "agenda-v1",
+    }
+    meeting_payload["ai_suggestion"] = suggestion
+
+    response = await client.post("/api/v1/meetings", json=meeting_payload)
+    assert response.status_code == 201, response.text
+    created = response.json()
+    assert created["ai_suggestion"] == suggestion
+
+    # Fetch to ensure it persisted in JSONB
+    fetched = (await client.get(f"/api/v1/meetings/{created['id']}")).json()
+    assert fetched["ai_suggestion"] == suggestion
+
+    # Update with new suggestion
+    updated_suggestion = {
+        "agenda": {"title": "Updated", "items": [], "language": "en"},
+        "model": "anthropic.claude-opus-5-5",
+        "prompt_version": "agenda-v1",
+    }
+    meeting_payload["ai_suggestion"] = updated_suggestion
+    update_response = await client.put(f"/api/v1/meetings/{created['id']}", json=meeting_payload)
+    assert update_response.status_code == 200, update_response.text
+    assert update_response.json()["ai_suggestion"] == updated_suggestion
+
+
 async def test_health_reports_database_ok(client):
     response = await client.get("/health")
 

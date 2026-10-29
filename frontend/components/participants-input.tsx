@@ -11,9 +11,10 @@ type Props = {
   value: ParticipantInput[];
   onChange: (participants: ParticipantInput[]) => void;
   errors?: Record<number, string | undefined>;
+  badge?: React.ReactNode;
 };
 
-export function ParticipantsInput({ value, onChange, errors }: Props) {
+export function ParticipantsInput({ value, onChange, errors, badge }: Props) {
   const update = (index: number, patch: Partial<ParticipantInput>) => {
     onChange(value.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   };
@@ -24,7 +25,10 @@ export function ParticipantsInput({ value, onChange, errors }: Props) {
 
   return (
     <div className="space-y-2">
-      <Label>Participants</Label>
+      <div className="flex items-center justify-between">
+        <Label>Participants</Label>
+        {badge}
+      </div>
       <div className="space-y-2">
         {value.map((participant, index) => (
           <div key={index} className="space-y-1">

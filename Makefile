@@ -39,6 +39,7 @@ AUTH_STACK ?= $(PROJECT_NAME)-auth
 APP_STACK ?= $(PROJECT_NAME)-backend
 ECR_STACK ?= $(PROJECT_NAME)-ecr
 FRONTEND_STACK ?= $(PROJECT_NAME)-frontend
+AI_STACK ?= $(PROJECT_NAME)-ai
 IMAGE_TAG ?= latest
 # x86_64 or arm64. arm64 is ~20% cheaper on Lambda and builds natively on
 # Apple Silicon; the image platform is derived from it so the two cannot drift.
@@ -295,6 +296,47 @@ aws-deploy-backend: aws-push ## Deploy the backend to AWS (Lambda function URL +
 	@$(MAKE) --no-print-directory aws-migrate
 	@$(MAKE) --no-print-directory aws-url
 
+aws-deploy-ai: ## Deploy the AI agenda parser stack (Lambda function URL + Bedrock Mantle)
+	$(require-aws-credentials)
+	@set -e; \
+		pool=$$($(call stack-output,$(AUTH_STACK),UserPoolId) 2>/dev/null | tr -d '[:space:]'); \
+		case "$$pool" in ""|None) pool="$(COGNITO_USER_POOL_ID)" ;; esac; \
+		case "$$pool" in ""|None) echo "No user pool found — run: make aws-deploy-auth or set COGNITO_USER_POOL_ID in .env"; exit 1 ;; esac; \
+		client=$$($(call stack-output,$(AUTH_STACK),UserPoolClientId) 2>/dev/null | tr -d '[:space:]'); \
+		case "$$client" in ""|None) client="$(COGNITO_CLIENT_ID)" ;; esac; \
+		repo=$$($(call stack-output,$(ECR_STACK),RepositoryUri) 2>/dev/null | tr -d '[:space:]'); \
+		test -n "$$repo" -a "$$repo" != "None" || { echo "No ECR repository found — run: make aws-ecr"; exit 1; }; \
+		digest=$$($(AWS) ecr describe-images --repository-name "$${repo#*/}" \
+			--image-ids imageTag=$(IMAGE_TAG) --query 'imageDetails[0].imageDigest' \
+			--output text 2>/dev/null | tr -d '[:space:]'); \
+		test -n "$$digest" -a "$$digest" != "None" || { echo "No image digest found for $(IMAGE_TAG) — run: make aws-push"; exit 1; }; \
+		cors="$(AWS_CORS_ORIGINS)"; \
+		if [ -z "$$cors" ]; then \
+			cors=$$($(call stack-output,$(FRONTEND_STACK),AllowedOrigins) 2>/dev/null | tr -d '[:space:]'); \
+			case "$$cors" in ""|None) cors='*' ;; esac; \
+		fi; \
+		model="$(or $(PARSER_MODEL),$(parser_model),us.anthropic.claude-opus-4-6-v1)"; \
+		tz="$(or $(APP_TIMEZONE),Europe/Kyiv)"; \
+		echo "Deploying AI parser stack $(AI_STACK) with Image=$$repo@$$digest Model=$$model Cors=$$cors"; \
+		$(call wait-stack-idle,$(AI_STACK)); \
+		$(call clear-failed-create,$(AI_STACK)); \
+		$(AWS) cloudformation deploy \
+			--stack-name $(AI_STACK) \
+			--template-file infra/ai.yml \
+			--capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+			--no-fail-on-empty-changeset \
+			$(STACK_TAGS) \
+			--parameter-overrides \
+				"ProjectName=$(PROJECT_NAME)" \
+				ImageUri="$$repo@$$digest" \
+				"Architecture=$(AWS_LAMBDA_ARCH)" \
+				"ParserModel=$$model" \
+				"CorsOrigins=$$cors" \
+				"CognitoUserPoolId=$$pool" \
+				"CognitoClientId=$$client" \
+				"AppTimezone=$$tz"
+	@$(MAKE) --no-print-directory aws-ai-url
+
 REPORTS_STACK ?= $(PROJECT_NAME)-reports
 SENDER_EMAIL ?= repeta.pn@ucu.edu.ua
 RECIPIENT_EMAIL ?= repeta.pn@ucu.edu.ua
@@ -386,6 +428,9 @@ aws-migrate: ## Apply database migrations (invokes the backend function directly
 aws-url: ## Print the deployed API URL
 	@$(call stack-output,$(APP_STACK),ApiUrl)
 
+aws-ai-url: ## Print the deployed AI parser Function URL
+	@$(call stack-output,$(AI_STACK),FunctionUrl)
+
 aws-status: ## Show the stack outputs and the API function's state
 	@$(AWS) cloudformation describe-stacks --stack-name $(APP_STACK) \
 		--query 'Stacks[0].Outputs' --output table
@@ -396,6 +441,9 @@ aws-status: ## Show the stack outputs and the API function's state
 
 aws-logs: ## Follow the backend function logs
 	$(AWS) logs tail /aws/lambda/$(PROJECT_NAME)-backend --follow
+
+aws-ai-logs: ## Follow the AI agenda parser function logs
+	$(AWS) logs tail /aws/lambda/$(PROJECT_NAME)-ai --follow
 
 aws-reports-logs: ## Follow the reports mailer function logs
 	$(AWS) logs tail /aws/lambda/$(PROJECT_NAME)-report-mailer --follow
@@ -503,6 +551,8 @@ aws-destroy: ## Delete every stack, including the database and its data
 		fi
 	-$(AWS) cloudformation delete-stack --stack-name $(FRONTEND_STACK)
 	-$(AWS) cloudformation wait stack-delete-complete --stack-name $(FRONTEND_STACK)
+	-$(AWS) cloudformation delete-stack --stack-name $(AI_STACK)
+	-$(AWS) cloudformation wait stack-delete-complete --stack-name $(AI_STACK)
 	@echo "Deleting $(APP_STACK) — Lambda releases its VPC network interfaces slowly, allow ~20 minutes."
 	$(AWS) cloudformation delete-stack --stack-name $(APP_STACK)
 	$(AWS) cloudformation wait stack-delete-complete --stack-name $(APP_STACK)

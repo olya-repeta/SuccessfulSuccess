@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     CheckConstraint,
@@ -13,7 +14,7 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID as PgUUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -45,6 +46,9 @@ class Meeting(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+    ai_suggestion: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, nullable=True, default=None
     )
 
     participants: Mapped[list["Participant"]] = relationship(

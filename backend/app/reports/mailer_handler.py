@@ -72,9 +72,7 @@ def handler(event, context):
         or "reports@example.com"
     ).strip()
     recipient_env = (
-        os.environ.get("RECIPIENT_EMAIL")
-        or os.environ.get("REPORT_RECIPIENT_EMAIL")
-        or sender
+        os.environ.get("RECIPIENT_EMAIL") or os.environ.get("REPORT_RECIPIENT_EMAIL") or sender
     ).strip()
     recipients = [r.strip() for r in recipient_env.split(",") if r.strip()]
 
